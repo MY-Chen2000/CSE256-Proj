@@ -50,7 +50,7 @@ def read_dataset(path):
     with open(path, 'r', encoding='utf-8') as f:
         lines = f.readlines()
         for i, line in enumerate(lines):
-            if i > 50:
+            if i > 10:
                 break
             line = line.strip()
             line = json.loads(line)

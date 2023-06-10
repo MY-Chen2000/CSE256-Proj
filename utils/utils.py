@@ -4,6 +4,7 @@ import numpy as np
 from typing import Optional, Union
 from transformers import AutoTokenizer, T5Tokenizer
 import torch
+import rouge
 
 ending_names = ['A', 'B', 'C', 'D']
 
@@ -47,7 +48,7 @@ class DataCollatorForMultipleChoice:
         return batch
 
 
-def get_input_feature(samples, max_source_length, max_len_gen, device):
+def get_input_feature(samples, max_source_length, max_len_gen, device, tokenizer):
     sep = ' '
     output_clue = []
     answers = []
@@ -68,7 +69,6 @@ def get_input_feature(samples, max_source_length, max_len_gen, device):
         output_clue.append(sample['question']['choices'][answer]['text'])
 
     # tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased", use_fast=True)
-    tokenizer = T5Tokenizer.from_pretrained('t5-base')
     def tokenizer_fun(input_ids, max_len):
         encoding = tokenizer(input_ids,
                              padding='longest',
@@ -85,3 +85,37 @@ def get_input_feature(samples, max_source_length, max_len_gen, device):
     clue_ids = torch.tensor(clue_ids, dtype=torch.long).to(device)
     answers = torch.tensor(answers, dtype=torch.long).to(device)
     return q_ids, q_mask, qo_ids, qo_mask, clue_ids, answers, output_clue
+
+
+
+rouge = rouge.Rouge()
+def compute_rouge(source, target):
+
+    source, target = ' '.join(source), ' '.join(target)
+    try:
+        scores = rouge.get_scores(hyps=source, refs=target)
+        return {
+            'rouge-1': scores[0]['rouge-1']['f'],
+            'rouge-2': scores[0]['rouge-2']['f'],
+            'rouge-l': scores[0]['rouge-l']['f'],
+        }
+    except ValueError:
+        return {
+            'rouge-1': 0.0,
+            'rouge-2': 0.0,
+            'rouge-l': 0.0,
+        }
+
+
+def compute_rouges(sources, targets):
+    scores = {
+        'rouge-1': 0.0,
+        'rouge-2': 0.0,
+        'rouge-l': 0.0,
+    }
+    for source, target in zip(sources, targets):
+        score = compute_rouge(source, target)
+        for k, v in scores.items():
+            scores[k] = v + score[k]
+    return {k: v / len(targets) for k, v in scores.items()}
+

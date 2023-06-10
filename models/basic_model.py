@@ -12,27 +12,38 @@ def get_model(model_name):
 
 
 class CustomModel(nn.Module):
-    def __init__(self, device_str):
+    def __init__(self, device_str, num_hidden_layers=1):
         super(CustomModel, self).__init__()
+        self.alpha = 0.5
+        self.beta = 0.5
         self.criterion = nn.CrossEntropyLoss()
         device = torch.device(device_str)
-        self.encoder = BertGenerationEncoder.from_pretrained("bert-base-uncased")
-        # add cross attention layers and use BERT's cls token as BOS token and sep token as EOS token
-        self.decoder = BertGenerationDecoder.from_pretrained(
-            "bert-base-uncased", add_cross_attention=True, is_decoder=True
-        )
-        self.bert_generation = EncoderDecoderModel(encoder=self.encoder, decoder=self.decoder)
-        self.t5_model = T5ForConditionalGeneration.from_pretrained('t5-base')
-        print(self.bert_generation)
-        print(self.t5_model)
+        # self.encoder = BertGenerationEncoder.from_pretrained("bert-base-uncased")
+        # # add cross attention layers and use BERT's cls token as BOS token and sep token as EOS token
+        # self.decoder = BertGenerationDecoder.from_pretrained(
+        #     "bert-base-uncased", add_cross_attention=True, is_decoder=True
+        # )
+        # self.bert_generation = EncoderDecoderModel(encoder=self.encoder, decoder=self.decoder)
+        self.t5_model = T5ForConditionalGeneration.from_pretrained('t5-base').to(device)
+        dim = self.t5_model.config.d_model
+        self.option_linear = nn.Linear(dim, 1).to(device)
+        self.option_linear.device = device
+        self.semantic_matching = SemanticMatch(dim, num_hidden_layers).to(device)
+        self.semantic_matching.device = device
+        num_attention_heads = dim // 64
+        self.transformer_laryer_de = MyTransformer(dim, num_attention_heads, num_hidden_layers).to(device)
+        self.transformer_laryer_de.device = device
+        self.relu = nn.ReLU()
+        self.choice_num = 4
+
 
     def forward(self, q_ids, q_mask, qo_ids, qo_mask, clue_ids=None, answers=None):
         if answers is not None and clue_ids is not None:
             opt_score, output_sequences = self.get_option_score(q_ids, q_mask, qo_ids, qo_mask)
-            local_device = self.bert_generation.device
-            bert_output = self.bert_generation(input_ids=q_ids.to(local_device), attention_mask=q_mask.to(local_device),
-                                      labels=clue_ids.to(local_device), decoder_input_ids=clue_ids.to(local_device))
-            loss_ans = bert_output.loss
+            local_device = self.t5_model.device
+            t5_output = self.t5_model(input_ids=q_ids.to(local_device), attention_mask=q_mask.to(local_device),
+                                      labels=clue_ids.to(local_device))
+            loss_ans = t5_output.loss
             loss = self.criterion(opt_score, answers)
             return self.alpha * loss + self.beta * loss_ans
         else:
@@ -43,10 +54,8 @@ class CustomModel(nn.Module):
         local_device = self.t5_model.encoder.device
         t5_output = self.t5_model.encoder(input_ids=qo_ids.to(local_device), attention_mask=qo_mask.to(local_device))
         encoder_qo = t5_output[0]
-        print(type(encoder_qo), encoder_qo.shape)
         t5_output = self.t5_model.encoder(input_ids=q_ids.to(local_device), attention_mask=q_mask.to(local_device))
         encoder_q = t5_output[0]
-        print(type(encoder_q), encoder_q.shape)
         local_device = self.t5_model.device
         t5_output = self.t5_model.generate(
             encoder_outputs=ModelOutput(last_hidden_state=encoder_q.to(local_device)),
@@ -55,24 +64,10 @@ class CustomModel(nn.Module):
             output_hidden_states=True,
             return_dict_in_generate=True
         )
-        print(type(t5_output), t5_output.shape)
 
-        local_device = self.bert_generation.encoder.device
-        bert_output = self.bert_generation.encoder(input_ids=qo_ids.to(local_device), attention_mask=qo_mask.to(local_device))
-        encoder_qo = bert_output[0]
-        print(type(encoder_qo), encoder_qo.shape)
-        bert_output = self.bert_generation.encoder(input_ids=q_ids.to(local_device), attention_mask=q_mask.to(local_device))
-        encoder_q = bert_output[0]
-
-        local_device = self.bert_generation.device
-        bert_output = self.bert_generation.decoder(
-            inputs_embeds=encoder_q.to(local_device),
-            attention_mask=q_mask.to(local_device),
-            output_hidden_states=True
-        )
-        output_sequences = bert_output.logits
+        output_sequences = t5_output.sequences
         output_sequences = output_sequences[:, 1:].contiguous()
-        decoder_o = bert_output.hidden_states
+        decoder_o = t5_output.decoder_hidden_states
         decoder_o = [item[-1] for item in decoder_o]
         decoder_o = torch.cat(decoder_o, dim=1)
 

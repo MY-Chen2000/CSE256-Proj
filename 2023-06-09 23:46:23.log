@@ -1,0 +1,8 @@
+root - INFO - dev_acc:0.18181818181818182
+root - INFO - eval:{'new best dev acc:': 0.18181818181818182, 'test_acc:': 0.18181818181818182, 'rouge:': 0.47953262571017174}
+root - INFO - dev_acc:0.18181818181818182
+root - INFO - dev_acc:0.18181818181818182
+root - INFO - dev_acc:0.18181818181818182
+root - INFO - dev_acc:0.18181818181818182
+root - INFO - dev_acc:0.18181818181818182
+root - INFO - eval:{'best dev acc:': 0.18181818181818182, 'best_test_acc:': 0.18181818181818182, 'best_dev_rouge_score:': 0.47953262571017174, 'best_test_rouge_score:': 0.468155233042142}

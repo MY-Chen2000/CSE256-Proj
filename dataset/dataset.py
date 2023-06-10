@@ -1,6 +1,7 @@
 from datasets import load_dataset, load_metric, ClassLabel
 from pprint import pprint
 from transformers import AutoTokenizer
+import json
 
 ending_names = ['A', 'B', 'C', 'D']
 
@@ -42,3 +43,25 @@ def load_data(files, tokenizer):
     encoded_datasets = updated.map(lambda examples: preprocess_function(examples, tokenizer), batched=True)
 
     return encoded_datasets
+
+
+def read_dataset(path):
+    dataset = []
+    with open(path, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+        for i, line in enumerate(lines):
+            if i > 10:
+                break
+            line = line.strip()
+            line = json.loads(line)
+            dataset.append(line)
+    return dataset
+
+
+def load_data_aug(data_path_dict):
+    return_dict = {}
+    for key in data_path_dict:
+        path = data_path_dict[key]
+        dataset = read_dataset(path)
+        return_dict[key] = dataset
+    return return_dict

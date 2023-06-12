@@ -10,7 +10,7 @@ import torch
 import logging
 from datetime import datetime
 
-logging.basicConfig(filename='{:%Y-%m-%d %H:%M:%S}.log'.format(datetime.now()), filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(filename='{:%Y-%m-%d-%H:%M:%S}.log'.format(datetime.now()), filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 torch.manual_seed(0)
 set_seed(0)
 

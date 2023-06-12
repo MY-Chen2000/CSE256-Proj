@@ -2,3 +2,5 @@
 .ipynb_checkpoints
 __pycache__/
 glove_embeddings/
+Data/*.txt
+*.log
